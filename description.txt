@@ -1,0 +1,11 @@
+Hello.
+
+We want to do the function calculator lab from 2011. Instead of using GTK we
+will use one of the other libraries mentioned on the course webpage.
+
+Possible extensions would be to let the program draw multiple functions at
+the same time, and also the area under or between them.
+
+Best regards
+
+Fahad Al-Khameesi & Jonathan Orrö
