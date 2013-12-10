@@ -1,6 +1,7 @@
 import Parsing
 import Data.Char
 import Data.Maybe
+import Test.QuickCheck
 
 data Expr = Num Double | Var String | Sin Expr | Cos Expr | Add Expr Expr | Mul Expr Expr
 instance Show Expr where
@@ -131,6 +132,20 @@ factor = do
          do
             a <- var
             return a
+            
+prop_showReadExpr :: Expr -> Bool
+prop_showReadExpr expr | isNothing e = False
+                       | otherwise = showExpr (fromJust e) == showExpr expr
+        where e = readExpr(showExpr expr)
+
+arbExpr :: Int -> Gen Expr
+arbExpr i = genExpr
+ 
+genExpr :: Gen Expr
+genExpr = elements [Num 5.0, Var "x", Add (Num 10.0) (Var "x"), Mul (Mul (Num 8.0) (Var "x")) (Num 20.0), Sin (Var "x"), Cos (Num 9.0)]
+
+instance Arbitrary Expr where
+    arbitrary = sized arbExpr 
 
 -- <expression> ::= <term> | <term> "+" <expression>
 
