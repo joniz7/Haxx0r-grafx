@@ -1,4 +1,5 @@
 import Parsing
+import Data.Char
 
 data Expr = Num Double | Var String | Sin Expr | Cos Expr | Add Expr Expr | Mul Expr Expr
 instance Show Expr where
@@ -32,8 +33,34 @@ eval (Num i) _     = i
 eval (Var s) i     = i
 eval (Add e1 e2) x = eval e1 x + eval e2 x
 eval (Mul e1 e2) x = eval e1 x * eval e2 x
-eval (Sin e)     x = sin (eval e x)
-eval (Cos e)     x = cos (eval e x)
+--eval (Sin e)     x = sin (eval e x)
+--eval (Cos e)     x = cos (eval e x)
 
 readExpr :: String -> Maybe Expr
-readExpr = undefined
+readExpr s = undefined
+
+-- <expression> ::= <term> | <term> "+" <expression>
+
+-- <term>       ::= <factor> | <factor> "*" <term>
+
+-- <factor>     ::= "(" <expression> ")" | <number>
+   
+num :: Parser Expr
+num = do
+      c <- oneOrMore digit
+      return (Num (read c ::Double))
+
+dot :: Parser Char
+dot = char '.'
+
+doub :: Parser Expr
+doub = do
+       i1 <- oneOrMore digit
+       d <- dot
+       i2 <- oneOrMore digit
+       return (Num ((toDouble i1)+
+         ((toDouble i2)/(10^(length i2)))))
+   where toDouble i = read i::Double
+
+
+

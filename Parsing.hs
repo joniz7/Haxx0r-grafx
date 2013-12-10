@@ -104,7 +104,6 @@ diglist = chain digit (char ',')
 
 
 
-
 instance Monad Parser where
   (>>=)  = (>*>)
   return = success
