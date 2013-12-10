@@ -35,5 +35,5 @@ eval (Mul e1 e2) x = eval e1 x * eval e2 x
 eval (Sin e)     x = sin (eval e x)
 eval (Cos e)     x = cos (eval e x)
 
-readExpr :: String -> Maybe Int
+readExpr :: String -> Maybe Expr
 readExpr = undefined
