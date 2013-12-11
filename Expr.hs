@@ -4,10 +4,14 @@ import Data.Char
 import Data.Maybe
 import Test.QuickCheck
 
+-- Defines a data type for expression
 data Expr = Num Double | Var String | Sin Expr | Cos Expr | Add Expr Expr | Mul Expr Expr
+
+-- Make Expr an instance of Show
 instance Show Expr where
    show = showExpr
 
+-- Converts an expression to a string    
 showExpr :: Expr -> String
 showExpr e = case e of
     (Num i) | i<0 -> "("++show i++")"
@@ -25,7 +29,8 @@ showExpr e = case e of
           paranthesis exp             = "(" ++ showExpr exp ++ ")"
           needParanthesis (Add e1 e2) = "(" ++ showExpr e1 ++ "+" ++ showExpr e2 ++ ")"
           needParanthesis exp         = showExpr exp
-          
+
+-- Given a value, calculates the value of the expression for that value
 eval :: Expr -> Double -> Double
 eval (Num i) _     = i
 eval (Var s) i     = i
@@ -34,29 +39,34 @@ eval (Mul e1 e2) x = eval e1 x * eval e2 x
 eval (Sin e)     x = sin (eval e x)
 eval (Cos e)     x = cos (eval e x)
 
+-- Converts a string to an expression data type.
 readExpr :: String -> Maybe Expr
 readExpr s = let s' = filter (not.isSpace) s
              in case parse expr s' of
                      Just (e,"") -> Just e
                      _           -> Nothing
-   
+
+                     -- Given a string and a value, first converts a string 
+-- to an expression, and then calculates its value for the given value
 readAndEval :: String -> Double -> Double
 readAndEval s d = eval (fromJust(readExpr s)) d
-   
+
+-- Parser for whole numbers  
 num :: Parser Expr
 num = do
       c <- oneOrMore digit
       return (Num (read c ::Double))
-
+-- Parse the '.' in doubles, helps when parsing numbers with decimals
 dot :: Parser Char
 dot = char '.'
 
+-- Parser for variable
 var :: Parser Expr
 var = 
       do
          char 'x'
          return (Var "x")
-
+-- Parser for numbers with decimals
 doub :: Parser Expr
 doub = 
        func
@@ -78,26 +88,18 @@ doub =
             return (Num (toDouble i1))
             
    where toDouble i = read i::Double
-
+-- Parser for functions
 func :: Parser Expr
-func = pSin +++ pCos
-   
-pSin :: Parser Expr
-pSin = do
-         char 's'
-         char 'i'
-         char 'n'
-         d <- factor
-         return (Sin d)
+func = do
+       a <- item
+       b <- item
+       c <- item
+       d <- factor   
+       if (a:b:c:[]) == "sin" then return (Sin d)   
+       else if (a:b:c:[]) == "cos" then return (Cos d)
+       else expr       
 
-pCos :: Parser Expr
-pCos = do
-         char 'c'
-         char 'o'
-         char 's'
-         d <- factor
-         return (Cos d)
-         
+-- Parser for outer expressions
 expr :: Parser Expr
 expr = do
          a <- term
@@ -108,7 +110,7 @@ expr = do
        do
          a <- term
          return a
-         
+-- Parser for terms         
 term :: Parser Expr
 term = do
          a <- factor
@@ -119,7 +121,7 @@ term = do
        do
          a <- factor
          return a
-         
+-- Parser for factors         
 factor :: Parser Expr
 factor = do
             char '('
@@ -135,6 +137,7 @@ factor = do
             a <- var
             return a
             
+-- Takes an expression and derives it with respect to x
 derive :: Expr -> Expr
 derive (Add e1 e2) = add (derive e1) (derive e2)
 derive (Mul e1 e2) = add (mul e1 (derive e2)) (mul e2 (derive e1))
@@ -156,6 +159,7 @@ add (Mul (Num i) (Var "x")) (Var "x") = mul (Num (i+1)) (Var "x")
 add (Mul (Var "x") (Num i)) (Var "x") = mul (Num (i+1)) (Var "x")
 
 {- 2x + 3x = 5x -}
+{-The code looks really ugly, but it makes the functions look so much nicer-}
 add (Mul (Num i1) (Var "x")) 
     (Mul (Num i2) (Var "x")) = mul (Num (i1+i2)) (Var "x")
 add (Mul (Num i1) (Var "x")) 
@@ -167,23 +171,36 @@ add (Mul (Var "x") (Num i1))
 
 add e1 e2               = Add e1 e2
 
+{-Same deal here as above. The code might look ugly, but the functions are so
+  pretty, so pretty-}
 mul _ (Num 0)       = Num 0
 mul (Num 0) _       = Num 0
 mul e (Num 1)       = e
 mul (Num 1) e       = e
 mul (Num (-1)) (Num (-1)) = Num 1
+
+mul (Num (-1)) (Mul (Num (-1)) e) = e
+mul (Num (-1)) (Mul e (Num (-1))) = e
+mul (Mul (Num (-1)) e) (Num (-1)) = e
+mul (Mul e (Num (-1))) (Num (-1)) = e
+
 mul (Num x) (Num y) = Num (x*y)
 mul e1 e2           = Mul e1 e2
-            
+
+-- Property to check the function readExpr and showExpr            
 prop_showReadExpr :: Expr -> Bool
 prop_showReadExpr expr | isNothing e = False
                        | otherwise = showExpr (fromJust e) == showExpr expr
         where e = readExpr(showExpr expr)
 
+-- An expression generator with a size parameter        
 rExpr :: Int -> Gen Expr
 rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
   where
    s' = s `div` 2
+   {-We had to generate the numbers like this since we would
+     otherwise get numbers like 1.2341212415e-2 which our
+     program can't parse.-}
    rNum = (elements [Num x| x <-[-100.0, -99.5..100.0]])
 
    rOp = do 
@@ -196,6 +213,8 @@ rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
       fu <- elements [Sin, Cos]
       e <- rExpr s'
       return (fu e)
+      
+-- Makes Expr an instance of Arbitrary      
 instance Arbitrary Expr where
   arbitrary = sized rExpr
-    
+     
