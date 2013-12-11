@@ -10,28 +10,22 @@ instance Show Expr where
 
 showExpr :: Expr -> String
 showExpr e = case e of
-    (Num i) -> show i
+    (Num i) | i<0 -> "("++show i++")"
+            |otherwise -> show i
     (Var s) -> s
     (Sin e) -> "sin " ++ paranthesis e
     (Cos e) -> "cos " ++ paranthesis e
-    (Add e1 e2) -> showExpr e1 ++ " + " ++ showExpr e2
+    (Add e1 e2) -> showExpr e1 ++ "+" ++ showExpr e2
     (Mul e1 e2) -> needParanthesis e1 ++ "*" ++ needParanthesis e2
 
     where paranthesis (Num i)         = showExpr (Num i)
           paranthesis (Var s)         = showExpr (Var s)
+          paranthesis (Sin e)         = showExpr (Sin e)
+          paranthesis (Cos e)         = showExpr (Cos e)
           paranthesis exp             = "(" ++ showExpr exp ++ ")"
           needParanthesis (Add e1 e2) = "(" ++ showExpr e1 ++ "+" ++ showExpr e2 ++ ")"
           needParanthesis exp         = showExpr exp
-
--- (5+6)*8*9 = 792
-ex1 = Mul (Var "x") (Num 20)
-
--- sin(7+2*1)
-ex2 = Sin (Add (Num 7) (Mul (Num 2) (Num 1)))
-
--- cos(x*4+6*2) + sin(x)
-ex3 = Add (Cos (Add (Mul (Var "x") (Num 4)) (Mul (Num 6) (Num 2)))) (Sin (Var "x"))
-
+          
 eval :: Expr -> Double -> Double
 eval (Num i) _     = i
 eval (Var s) i     = i
@@ -78,8 +72,7 @@ doub =
          i1 <- oneOrMore digit
          d <- dot
          i2 <- oneOrMore digit
-         return (Num ((toDouble i1)+
-            ((toDouble i2)/(10^(length i2)))))
+         return (Num (toDouble (i1++"."++i2)))
        +++ do 
             i1 <- oneOrMore digit
             return (Num (toDouble i1))
@@ -142,6 +135,46 @@ factor = do
             a <- var
             return a
             
+derive :: Expr -> Expr
+derive (Add e1 e2) = add (derive e1) (derive e2)
+derive (Mul e1 e2) = add (mul e1 (derive e2)) (mul e2 (derive e1))
+derive (Sin e)     = mul (Cos e) (derive e)
+derive (Cos e)     = mul (mul (Num (-1)) (Sin e)) (derive e)
+derive (Var "x")   = Num 1
+derive _           = Num 0
+
+{- Some special cases to make the functions look nicer after derivation -}
+add (Num x) (Num y)     = Num (x+y)
+add e (Num 0)           = e
+add (Num 0) e           = e
+add (Var "x") (Var "x") = mul (Num 2) (Var "x")
+
+{- x + 2x = 3x -}
+add (Var "x") (Mul (Num i) (Var "x")) = mul (Num (i+1)) (Var "x")
+add (Var "x") (Mul (Var "x") (Num i)) = mul (Num (i+1)) (Var "x")
+add (Mul (Num i) (Var "x")) (Var "x") = mul (Num (i+1)) (Var "x")
+add (Mul (Var "x") (Num i)) (Var "x") = mul (Num (i+1)) (Var "x")
+
+{- 2x + 3x = 5x -}
+add (Mul (Num i1) (Var "x")) 
+    (Mul (Num i2) (Var "x")) = mul (Num (i1+i2)) (Var "x")
+add (Mul (Num i1) (Var "x")) 
+    (Mul (Var "x") (Num i2)) = mul (Num (i1+i2)) (Var "x")
+add (Mul (Var "x") (Num i1)) 
+    (Mul (Num i2) (Var "x")) = mul (Num (i1+i2)) (Var "x")
+add (Mul (Var "x") (Num i1)) 
+    (Mul (Var "x") (Num i2)) = mul (Num (i1+i2)) (Var "x")
+
+add e1 e2               = Add e1 e2
+
+mul _ (Num 0)       = Num 0
+mul (Num 0) _       = Num 0
+mul e (Num 1)       = e
+mul (Num 1) e       = e
+mul (Num (-1)) (Num (-1)) = Num 1
+mul (Num x) (Num y) = Num (x*y)
+mul e1 e2           = Mul e1 e2
+            
 prop_showReadExpr :: Expr -> Bool
 prop_showReadExpr expr | isNothing e = False
                        | otherwise = showExpr (fromJust e) == showExpr expr
@@ -151,7 +184,7 @@ rExpr :: Int -> Gen Expr
 rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
   where
    s' = s `div` 2
-   rNum = fmap Num arbitrary
+   rNum = (elements [Num x| x <-[-100.0, -99.5..100.0]])
 
    rOp = do 
       op <- elements [Add,Mul]
