@@ -4,10 +4,14 @@ import Data.Char
 import Data.Maybe
 import Test.QuickCheck
 
+-- Defines a data type for expression
 data Expr = Num Double | Var String | Sin Expr | Cos Expr | Add Expr Expr | Mul Expr Expr
+
+-- Make Expr an instance of Show
 instance Show Expr where
    show = showExpr
 
+-- Converts an expression to a string    
 showExpr :: Expr -> String
 showExpr e = case e of
     (Num i) -> show i
@@ -23,15 +27,7 @@ showExpr e = case e of
           needParanthesis (Add e1 e2) = "(" ++ showExpr e1 ++ "+" ++ showExpr e2 ++ ")"
           needParanthesis exp         = showExpr exp
 
--- (5+6)*8*9 = 792
-ex1 = Mul (Var "x") (Num 20)
-
--- sin(7+2*1)
-ex2 = Sin (Add (Num 7) (Mul (Num 2) (Num 1)))
-
--- cos(x*4+6*2) + sin(x)
-ex3 = Add (Cos (Add (Mul (Var "x") (Num 4)) (Mul (Num 6) (Num 2)))) (Sin (Var "x"))
-
+-- Given a value, calculates the value of the expression for that value
 eval :: Expr -> Double -> Double
 eval (Num i) _     = i
 eval (Var s) i     = i
@@ -40,29 +36,34 @@ eval (Mul e1 e2) x = eval e1 x * eval e2 x
 eval (Sin e)     x = sin (eval e x)
 eval (Cos e)     x = cos (eval e x)
 
+-- Converts a string to an expression data type.
 readExpr :: String -> Maybe Expr
 readExpr s = let s' = filter (not.isSpace) s
              in case parse expr s' of
                      Just (e,"") -> Just e
                      _           -> Nothing
-   
+
+                     -- Given a string and a value, first converts a string 
+-- to an expression, and then calculates its value for the given value
 readAndEval :: String -> Double -> Double
 readAndEval s d = eval (fromJust(readExpr s)) d
-   
+
+-- Parser for whole numbers  
 num :: Parser Expr
 num = do
       c <- oneOrMore digit
       return (Num (read c ::Double))
-
+-- Parse the '.' in doubles, helps when parsing numbers with decimals
 dot :: Parser Char
 dot = char '.'
 
+-- Parser for variable
 var :: Parser Expr
 var = 
       do
          char 'x'
          return (Var "x")
-
+-- Parser for numbers with decimals
 doub :: Parser Expr
 doub = 
        func
@@ -85,26 +86,18 @@ doub =
             return (Num (toDouble i1))
             
    where toDouble i = read i::Double
-
+-- Parser for functions
 func :: Parser Expr
-func = pSin +++ pCos
-   
-pSin :: Parser Expr
-pSin = do
-         char 's'
-         char 'i'
-         char 'n'
-         d <- factor
-         return (Sin d)
+func = do
+       a <- item
+       b <- item
+       c <- item
+       d <- factor   
+       if (a:b:c:[]) == "sin" then return (Sin d)   
+       else if (a:b:c:[]) == "cos" then return (Cos d)
+       else expr       
 
-pCos :: Parser Expr
-pCos = do
-         char 'c'
-         char 'o'
-         char 's'
-         d <- factor
-         return (Cos d)
-         
+-- Parser for outer expressions
 expr :: Parser Expr
 expr = do
          a <- term
@@ -115,7 +108,7 @@ expr = do
        do
          a <- term
          return a
-         
+-- Parser for terms         
 term :: Parser Expr
 term = do
          a <- factor
@@ -126,7 +119,7 @@ term = do
        do
          a <- factor
          return a
-         
+-- Parser for factors         
 factor :: Parser Expr
 factor = do
             char '('
@@ -141,17 +134,19 @@ factor = do
          do
             a <- var
             return a
-            
+
+-- Property to check the function readExpr and showExpr            
 prop_showReadExpr :: Expr -> Bool
 prop_showReadExpr expr | isNothing e = False
                        | otherwise = showExpr (fromJust e) == showExpr expr
         where e = readExpr(showExpr expr)
 
+-- An expression generator with a size parameter        
 rExpr :: Int -> Gen Expr
 rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
   where
    s' = s `div` 2
-   rNum = fmap Num arbitrary
+   rNum = fmap Num (arbitrary:: Gen Double)
 
    rOp = do 
       op <- elements [Add,Mul]
@@ -163,6 +158,8 @@ rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
       fu <- elements [Sin, Cos]
       e <- rExpr s'
       return (fu e)
+      
+-- Makes Expr an instance of Arbitrary      
 instance Arbitrary Expr where
   arbitrary = sized rExpr
-    
+     
