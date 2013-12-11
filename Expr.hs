@@ -1,3 +1,4 @@
+module Expr where
 import Parsing
 import Data.Char
 import Data.Maybe
@@ -23,7 +24,7 @@ showExpr e = case e of
           needParanthesis exp         = showExpr exp
 
 -- (5+6)*8*9 = 792
-ex1 = Mul (Add (Num 5) (Num 6)) (Mul (Num 8) (Num 9))
+ex1 = Mul (Var "x") (Num 20)
 
 -- sin(7+2*1)
 ex2 = Sin (Add (Num 7) (Mul (Num 2) (Num 1)))
@@ -57,13 +58,21 @@ dot :: Parser Char
 dot = char '.'
 
 var :: Parser Expr
-var = do
+var = 
+      do
          char 'x'
          return (Var "x")
 
 doub :: Parser Expr
 doub = 
        func
+       +++
+       do
+         char '('
+         char '-'
+         i <- doub
+         char ')'
+         return (Num (- (eval i 0)))
        +++
        do
          i1 <- oneOrMore digit
@@ -138,18 +147,22 @@ prop_showReadExpr expr | isNothing e = False
                        | otherwise = showExpr (fromJust e) == showExpr expr
         where e = readExpr(showExpr expr)
 
-arbExpr :: Int -> Gen Expr
-arbExpr i = genExpr
- 
-genExpr :: Gen Expr
-genExpr = elements [Num 5.0, Var "x", Add (Num 10.0) (Var "x"), Mul (Mul (Num 8.0) (Var "x")) (Num 20.0), Sin (Var "x"), Cos (Num 9.0)]
+rExpr :: Int -> Gen Expr
+rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
+  where
+   s' = s `div` 2
+   rNum = fmap Num arbitrary
 
+   rOp = do 
+      op <- elements [Add,Mul]
+      e1 <- rExpr s'
+      e2 <- rExpr s'
+      return $ op e1 e2
+
+   rFu = do
+      fu <- elements [Sin, Cos]
+      e <- rExpr s'
+      return (fu e)
 instance Arbitrary Expr where
-    arbitrary = sized arbExpr 
-
--- <expression> ::= <term> | <term> "+" <expression>
-
--- <term>       ::= <factor> | <factor> "*" <term>
-
--- <factor>     ::= "(" <expression> ")" | <number>
-
+  arbitrary = sized rExpr
+    
