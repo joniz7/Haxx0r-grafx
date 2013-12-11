@@ -49,7 +49,7 @@ readExpr s = let s' = filter (not.isSpace) s
                      -- Given a string and a value, first converts a string 
 -- to an expression, and then calculates its value for the given value
 readAndEval :: String -> Double -> Double
-readAndEval s d = eval (fromJust(readExpr s)) d
+readAndEval s = eval (fromJust(readExpr s))
 
 -- Parser for whole numbers  
 num :: Parser Expr
@@ -95,8 +95,8 @@ func = do
        b <- item
        c <- item
        d <- factor   
-       if (a:b:c:[]) == "sin" then return (Sin d)   
-       else if (a:b:c:[]) == "cos" then return (Cos d)
+       if [a,b,c] == "sin" then return (Sin d)   
+       else if [a,b,c] == "cos" then return (Cos d)
        else expr       
 
 -- Parser for outer expressions
@@ -107,9 +107,7 @@ expr = do
          b <- expr
          return (Add a b)
        +++
-       do
-         a <- term
-         return a
+       term
 -- Parser for terms         
 term :: Parser Expr
 term = do
@@ -118,9 +116,7 @@ term = do
          b <- term
          return (Mul a b)
        +++
-       do
-         a <- factor
-         return a
+       factor
 -- Parser for factors         
 factor :: Parser Expr
 factor = do
@@ -129,13 +125,9 @@ factor = do
             char ')'
             return a
          +++
-         do
-            a <- doub
-            return a
+         doub
          +++
-         do
-            a <- var
-            return a
+         var
             
 -- Takes an expression and derives it with respect to x
 derive :: Expr -> Expr
@@ -201,7 +193,7 @@ rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
    {-We had to generate the numbers like this since we would
      otherwise get numbers like 1.2341212415e-2 which our
      program can't parse.-}
-   rNum = (elements [Num x| x <-[-100.0, -99.5..100.0]])
+   rNum = elements [Num x| x <-[-100.0, -99.5..100.0]]
 
    rOp = do 
       op <- elements [Add,Mul]

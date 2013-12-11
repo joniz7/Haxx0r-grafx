@@ -49,7 +49,7 @@ parseAndDraw en can =
    do dw <- widgetGetDrawWindow can
       drawWindowClear dw
       s <- entryGetText en
-      (drawFunction can (points (safeFromJust (readExpr s)) 0.05 (250, 250)))
+      drawFunction can (points (safeFromJust (readExpr s)) 0.05 (250, 250))
       return ()
       
 --A function that will parse what is in the text-field
@@ -87,19 +87,19 @@ drawFunction can (p:(p':ps)) =
 --scale.
 points :: Expr -> Double -> (Int, Int) -> [Point]
 points e s (maxX, maxY) = [(round(x/s) + maxX, 
-                           toBottomLeft (round ((eval e x)/s)+maxY) (maxY*2))
+                           toBottomLeft (round (eval e x/s)+maxY) (maxY*2))
                            | x <- interval (-maxX) maxX s, 
                            eval e (x*s) < fromIntegral maxY, 
-                           eval e (x*s) > (fromIntegral (-maxY))]
+                           eval e (x*s) > fromIntegral (-maxY)]
 
 --Generates a list of doubles between two values with a given interval
 interval :: Int -> Int -> Double -> [Double]
 interval l u i = [l', l'+i..u'-i]
    where 
-      l' = (fromIntegral l)*i
-      u' = (fromIntegral u)*i
+      l' = fromIntegral l*i
+      u' = fromIntegral u*i
       
 --Transforms a given y-coordinate from a coordinate system with the
 --origin at the top left corner to one with the origin in the bottom right
 toBottomLeft :: Int -> Int -> Int
-toBottomLeft y max = (max - y)
+toBottomLeft y max = max - y
