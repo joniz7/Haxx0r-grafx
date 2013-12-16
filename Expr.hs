@@ -116,7 +116,7 @@ term = do
          b <- term
          return (Mul a b)
        +++
-       factor
+       factor       
 -- Parser for factors         
 factor :: Parser Expr
 factor = do
@@ -128,7 +128,18 @@ factor = do
          doub
          +++
          var
-            
+-- Simplifies a given expression         
+simplify :: Expr -> Expr
+simplify (Add a b)      = add (simplify a) (simplify b)
+simplify (Mul a b)      = mul (simplify a) (simplify b)         
+simplify  (Sin expr)    = Sin (simplify expr)
+simplify  (Cos expr)    = Cos (simplify expr)
+simplify   expr         = expr
+
+-- Test property for simplify-function
+prop_simplify :: Expr -> Double -> Bool
+prop_simplify expr n = (eval expr n) == (eval (simplify expr) n)               
+
 -- Takes an expression and derives it with respect to x
 derive :: Expr -> Expr
 derive (Add e1 e2) = add (derive e1) (derive e2)
