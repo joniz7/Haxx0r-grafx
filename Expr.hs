@@ -6,7 +6,7 @@ import Test.QuickCheck
 
 -- Defines a data type for expression
 data Expr = Num Double | Var String | Sin Expr | Cos Expr | Add Expr Expr | Mul Expr Expr
-
+   --deriving Show
 -- Make Expr an instance of Show
 instance Show Expr where
    show = showExpr
@@ -132,13 +132,20 @@ factor = do
 simplify :: Expr -> Expr
 simplify (Add a b)      = add (simplify a) (simplify b)
 simplify (Mul a b)      = mul (simplify a) (simplify b)         
-simplify  (Sin expr)    = Sin (simplify expr)
-simplify  (Cos expr)    = Cos (simplify expr)
-simplify   expr         = expr
+simplify (Sin expr)    = Sin (simplify expr)
+simplify (Cos expr)    = Cos (simplify expr)
+simplify expr         = expr
 
 -- Test property for simplify-function
+
+{- Because of inaccuracy in the Double datatype a simplified version of
+   a very complex equation might result in a slightly different value.
+   Therefore we check if eval of av expression is close to the eval of
+   the simplified version of that expression. -}
+   
 prop_simplify :: Expr -> Double -> Bool
-prop_simplify expr n = (eval expr n) == (eval (simplify expr) n)               
+prop_simplify expr n = (eval expr n) > (eval (simplify expr) n) - (10e-3) 
+                       || (eval expr n) < (eval (simplify expr) n) + (10e-3)
 
 -- Takes an expression and derives it with respect to x
 derive :: Expr -> Expr
@@ -171,7 +178,27 @@ add (Mul (Var "x") (Num i1))
     (Mul (Num i2) (Var "x")) = mul (Num (i1+i2)) (Var "x")
 add (Mul (Var "x") (Num i1)) 
     (Mul (Var "x") (Num i2)) = mul (Num (i1+i2)) (Var "x")
+    
+add (Add (Num i1) (Var "x")) 
+    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Var "x")
+add (Add (Num i1) (Var "x")) 
+    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Var "x")
+add (Add (Var "x") (Num i1)) 
+    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Var "x")
+add (Add (Var "x") (Num i1)) 
+    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Var "x")
+    
+add (Num i1) (Add e (Num i2)) = add (Num (i1+i2)) e
+add (Num i1) (Add (Num i2) e) = add (Num (i1+i2)) e
+add (Add e (Num i2)) (Num i1)= add (Num (i1+i2)) e
+add (Add (Num i2) e) (Num i1)= add (Num (i1+i2)) e
 
+{-
+add e1 (Add e2 (Num i)) = add (Num i) (add e1 e2)
+add e1 (Add (Num i) e2) = add (Num i) (add e1 e2)
+add (Add e1 (Num i)) e2= add (Num i) (add e1 e2)
+add (Add (Num i) e1) e2= add (Num i) (add e1 e2)
+-}
 add e1 e2               = Add e1 e2
 
 {-Same deal here as above. The code might look ugly, but the functions are so
@@ -182,13 +209,28 @@ mul e (Num 1)       = e
 mul (Num 1) e       = e
 mul (Num (-1)) (Num (-1)) = Num 1
 
-mul (Num (-1)) (Mul (Num (-1)) e) = e
-mul (Num (-1)) (Mul e (Num (-1))) = e
-mul (Mul (Num (-1)) e) (Num (-1)) = e
-mul (Mul e (Num (-1))) (Num (-1)) = e
+mul (Num x) (Mul (Num y) e) = mul (Num (x*y)) e
+mul (Num x) (Mul e (Num y)) = mul (Num (x*y)) e
+mul (Mul (Num x) e) (Num y) = mul (Num (x*y)) e
+mul (Mul e (Num x)) (Num y) = mul (Num (x*y)) e
 
 mul (Num x) (Num y) = Num (x*y)
-mul e1 e2           = Mul e1 e2
+
+mul (Mul (Num i1) e1) 
+    (Mul (Num i2) e2) = mul (Num (i1*i2)) (mul e1 e2)
+mul (Mul (Num i1) e1) 
+    (Mul e2 (Num i2)) = mul (Num (i1*i2)) (mul e1 e2)
+mul (Mul e1 (Num i1)) 
+    (Mul (Num i2) e2) = mul (Num (i1*i2)) (mul e1 e2)
+mul (Mul e1 (Num i1)) 
+    (Mul e2 (Num i2)) = mul (Num (i1*i2)) (mul e1 e2)
+
+mul e1 (Mul (Num i) e2) = mul (Num i) (mul e1 e2)
+mul e1 (Mul e2 (Num i)) = mul (Num i) (mul e1 e2)
+mul (Mul e1 (Num i)) e2 = mul (Num i) (mul e1 e2)
+mul (Mul (Num i) e1) e2 = mul (Num i) (mul e1 e2)
+    
+mul e1 e2 = Mul e1 e2
 
 -- Property to check the function readExpr and showExpr            
 prop_showReadExpr :: Expr -> Bool
