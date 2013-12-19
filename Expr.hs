@@ -136,16 +136,70 @@ simplify (Sin expr)    = Sin (simplify expr)
 simplify (Cos expr)    = Cos (simplify expr)
 simplify expr         = expr
 
--- Test property for simplify-function
-
+-- Tests if the simplified expression actually evaluates to the same value.
 {- Because of inaccuracy in the Double datatype a simplified version of
    a very complex equation might result in a slightly different value.
    Therefore we check if eval of av expression is close to the eval of
    the simplified version of that expression. -}
-   
-prop_simplify :: Expr -> Double -> Bool
-prop_simplify expr n = (eval expr n) > (eval (simplify expr) n) - (10e-3) 
-                       || (eval expr n) < (eval (simplify expr) n) + (10e-3)
+prop_evalSimplify :: Expr -> Double -> Bool
+prop_evalSimplify expr n = (eval expr n) > (eval (simplify expr) n) - (10e-3) 
+                       && (eval expr n) < (eval (simplify expr) n) + (10e-3)
+                       
+-- Tests if simplify actually simplifies the expression.
+prop_simplify :: Expr -> Bool
+prop_simplify = isSimplified.simplify
+                       
+{- A huge function that checks if a expression is simplified by searching
+  for "illegal" patterns like something multifplied to 0 or 1 and so on. -}
+isSimplified :: Expr -> Bool
+-- 3 + 4
+isSimplified (Add (Num n) (Num m)) = False
+
+-- 3 + (e + 4)
+isSimplified (Add (Num n) (Add e (Num m))) = False
+isSimplified (Add (Num n) (Add (Num m) e)) = False
+isSimplified (Add (Add e (Num m)) (Num n)) = False
+isSimplified (Add (Add (Num m) e) (Num n)) = False
+
+-- (3 + e) + (4 + e)
+isSimplified (Add (Add e1 (Num n)) (Add e2 (Num m))) = False
+isSimplified (Add (Add e1 (Num n)) (Add (Num m) e2)) = False
+isSimplified (Add (Add (Num m) e1) (Add (Num n) e2)) = False
+isSimplified (Add (Add (Num m) e1) (Add e2 (Num n))) = False
+
+-- e + 0
+isSimplified (Add e (Num 0)) = False
+isSimplified (Add (Num 0) e) = False
+
+-- 3 * 4
+isSimplified (Mul (Num n) (Num m)) = False
+
+-- 3 * (e * 4)
+isSimplified (Mul (Num n) (Mul e (Num m))) = False
+isSimplified (Mul (Num n) (Mul (Num m) e)) = False
+isSimplified (Mul (Mul e (Num m)) (Num n)) = False
+isSimplified (Mul (Mul (Num m) e) (Num n)) = False
+
+-- (3 * e) * (e * 4)
+isSimplified (Mul (Mul e1 (Num n)) (Mul e2 (Num m))) = False
+isSimplified (Mul (Mul e1 (Num n)) (Mul (Num m) e2)) = False
+isSimplified (Mul (Mul (Num m) e1) (Mul (Num n) e2)) = False
+isSimplified (Mul (Mul (Num m) e1) (Mul e2 (Num n))) = False
+
+-- e * 0
+isSimplified (Mul e (Num 0)) = False
+isSimplified (Mul (Num 0) e) = False
+
+-- e * 1
+isSimplified (Mul e (Num 1)) = False
+isSimplified (Mul (Num 1) e) = False
+
+isSimplified (Add e1 e2) = isSimplified e1 && isSimplified e2
+isSimplified (Mul e1 e2) = isSimplified e1 && isSimplified e2
+isSimplified (Sin e) = isSimplified e
+isSimplified (Cos e) = isSimplified e
+isSimplified (Num n) = True
+isSimplified (Var "x") = True
 
 -- Takes an expression and derives it with respect to x
 derive :: Expr -> Expr
@@ -180,13 +234,13 @@ add (Mul (Var "x") (Num i1))
     (Mul (Var "x") (Num i2)) = mul (Num (i1+i2)) (Var "x")
     
 add (Add (Num i1) (Var "x")) 
-    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Var "x")
+    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Mul (Num 2) (Var "x"))
 add (Add (Num i1) (Var "x")) 
-    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Var "x")
+    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Mul (Num 2) (Var "x"))
 add (Add (Var "x") (Num i1)) 
-    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Var "x")
+    (Add (Num i2) (Var "x")) = add (Num (i1+i2)) (Mul (Num 2) (Var "x"))
 add (Add (Var "x") (Num i1)) 
-    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Var "x")
+    (Add (Var "x") (Num i2)) = add (Num (i1+i2)) (Mul (Num 2) (Var "x"))
     
 add (Num i1) (Add e (Num i2)) = add (Num (i1+i2)) e
 add (Num i1) (Add (Num i2) e) = add (Num (i1+i2)) e
@@ -240,7 +294,7 @@ prop_showReadExpr expr | isNothing e = False
 
 -- An expression generator with a size parameter        
 rExpr :: Int -> Gen Expr
-rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu)]
+rExpr s = frequency [(1,rNum),(s,rOp), (s,rFu), (s, return (Var "x"))]
   where
    s' = s `div` 2
    {-We had to generate the numbers like this since we would
